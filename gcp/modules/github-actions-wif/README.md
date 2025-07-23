@@ -6,7 +6,7 @@ Minimum configuration To use the module, the following needs to be specified:
 
 ```
 module "gh_actions" {
-    source = "github.com/rickliujh/tf-tmpl//gcp/modules/github-actions"
+    source = "github.com/rickliujh/tf-tmpl//gcp/modules/github-actions-wif"
 
     project_id    = "go-kickstart"
     github_org    = "rickliujh"
