@@ -80,8 +80,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |-
           PR_NUMBER=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')
-          echo "PR number is ${PR_NUMBER}"
-          echo "PR_NUMBER=${PR_NUMBER}" >> "${GITHUB_ENV}"
+          echo "PR number is $${PR_NUMBER}"
+          echo "PR_NUMBER=$${PR_NUMBER}" >> "$${GITHUB_ENV}"
 
       - name: Run unit test
         id: ut
@@ -153,8 +153,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |-
           PR_NUMBER=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')
-          echo "PR number is ${PR_NUMBER}"
-          echo "PR_NUMBER=${PR_NUMBER}" >> "${GITHUB_ENV}"
+          echo "PR number is $${PR_NUMBER}"
+          echo "PR_NUMBER=$${PR_NUMBER}" >> "$${GITHUB_ENV}"
 
       - name: Comment to PR
         if: github.event_name == 'pull_request'
@@ -191,8 +191,8 @@ jobs:
       - name: Build and Push Container
         run: |-
           DOCKER_TAG="$${{ env.REGION }}-docker.pkg.dev/$${{ env.PROJECT_ID }}/$${{ env.GAR_REPO_NAME }}/$${{env.SERVICE_NAME}}:$${{ github.sha }}"
-          docker build --tag "${DOCKER_TAG}" .
-          docker push "${DOCKER_TAG}"
+          docker build --tag "$${DOCKER_TAG}" .
+          docker push "$${DOCKER_TAG}"
 
   deploy:
     runs-on: 'ubuntu-latest'
