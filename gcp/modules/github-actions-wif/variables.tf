@@ -42,6 +42,11 @@ variable "override_repository_default_branch_name" {
   default     = null
 }
 
+variable "override_wif_pool_id" {
+  description = "Override the default workload identity federation pool id, defaults to github-actions-pool"
+  type        = string
+  default     = null
+}
 variable "override_tags" {
   description = "Override tags to apply to GCP resources"
   type        = map(string)

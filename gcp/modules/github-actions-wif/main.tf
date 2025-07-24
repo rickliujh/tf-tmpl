@@ -3,6 +3,7 @@ locals {
   repository_default_branch_name = coalesce(var.override_repository_default_branch_name, "main")
   github_prod_env_name           = coalesce(var.github_prod_env_name, "prod")
   allow_pull_request             = coalesce(var.override_allow_pull_request, true)
+  wif_pool_id                    = coalesce(var.override_wif_pool_id, "github-actions-pool")
 
   aws_tags = {
     name    = "tf-github-actions-gcp-wif",
@@ -13,21 +14,11 @@ locals {
   github_issuer = "https://token.actions.githubusercontent.com"
 }
 
-# Create the GitHub provider to use the GitHub token retrieved from SSM
-resource "local_file" "tf_github_provider" {
-  filename             = "${path.root}/provider-github.tf"
-  directory_permission = "0666"
-  file_permission      = "0666"
-  content = templatefile("${path.module}/templates/provider-github.tf.tmpl", {
-    github_organization = var.github_org
-  })
-}
-
 resource "google_iam_workload_identity_pool" "github" {
   provider = google-beta
   project  = var.project_id
 
-  workload_identity_pool_id = "github-actions-pool1"
+  workload_identity_pool_id = local.wif_pool_id
   display_name              = "Github Actions Pool"
   description               = "Identity pool operates in FEDERATION_ONLY mode"
   disabled                  = false
