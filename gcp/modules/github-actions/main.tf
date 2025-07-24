@@ -25,8 +25,9 @@ data "google_project" "proj" {
 module "gh_actions_wif" {
   source = "github.com/rickliujh/tf-tmpl//gcp/modules/github-actions-wif"
 
-  project_id    = var.project_id
-  github_org    = var.github_org
-  github_repo   = var.github_repo
-  github_org_id = var.github_org_id
+  project_id           = var.project_id
+  github_org           = var.github_org
+  github_repo          = var.github_repo
+  github_org_id        = var.github_org_id
+  override_wif_pool_id = local.wif_pool_id
 }
