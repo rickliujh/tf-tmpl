@@ -18,6 +18,18 @@ variable "github_repo" {
   type        = string
 }
 
+variable "override_allow_pull_request" {
+  description = "If allow workflow run on pull request to grant access to GCP resources on non-production environment, defaults to true"
+  type        = bool
+  default     = null
+}
+
+variable "github_prod_env_name" {
+  description = "Override github prod envrionment name, defaults to prod"
+  type        = string
+  default     = null
+}
+
 variable "override_terraform_source_dir" {
   description = "Override the directory in the repo where the terraform code is, defaults to terraform/ - please include trailing slash in override"
   type        = string

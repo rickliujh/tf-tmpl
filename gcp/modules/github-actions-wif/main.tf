@@ -1,6 +1,8 @@
 locals {
   terraform_source_dir           = coalesce(var.override_terraform_source_dir, "terraform/")
   repository_default_branch_name = coalesce(var.override_repository_default_branch_name, "main")
+  github_prod_env_name           = coalesce(var.github_prod_env_name, "prod")
+  allow_pull_request             = coalesce(var.override_allow_pull_request, true)
 
   aws_tags = {
     name    = "tf-github-actions-gcp-wif",
@@ -25,7 +27,7 @@ resource "google_iam_workload_identity_pool" "github" {
   provider = google-beta
   project  = var.project_id
 
-  workload_identity_pool_id = "github-actions-pool"
+  workload_identity_pool_id = "github-actions-pool1"
   display_name              = "Github Actions Pool"
   description               = "Identity pool operates in FEDERATION_ONLY mode"
   disabled                  = false
@@ -48,15 +50,18 @@ resource "google_iam_workload_identity_pool_provider" "provider" {
     assertion.repository_owner_id == "${var.github_org_id}" &&
     attribute.repository == "${var.github_org}/${var.github_repo}" &&
     (
-      (assertion.ref == "refs/heads/main" && assertion.ref_type == "branch") ||
-      (assertion.ref_type == "pull_request")
+      (assertion.ref == "refs/heads/main" && assertion.ref_type == "branch") 
+      ${local.allow_pull_request == true ? "|| (attribute.environment != \"${local.github_prod_env_name}\" && assertion.ref_type == \"pull_request\")" : ""}
     )
 EOT
   attribute_mapping = {
-    "google.subject"       = "assertion.sub"
-    "attribute.actor"      = "assertion.actor"
-    "attribute.aud"        = "assertion.aud"
-    "attribute.repository" = "assertion.repository"
+    "google.subject"        = "assertion.sub"
+    "attribute.actor"       = "assertion.actor"
+    "attribute.aud"         = "assertion.aud"
+    "attribute.repository"  = "assertion.repository"
+    "attribute.environment" = "assertion.environment"
+    "attribute.ref"         = "assertion.ref"
+    "attribute.ref_type"    = "assertion.ref_type"
   }
   oidc {
     issuer_uri = local.github_issuer
