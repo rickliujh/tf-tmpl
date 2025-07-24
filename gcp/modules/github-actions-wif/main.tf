@@ -41,7 +41,7 @@ resource "google_iam_workload_identity_pool_provider" "provider" {
     assertion.repository_owner_id == "${var.github_org_id}" &&
     attribute.repository == "${var.github_org}/${var.github_repo}" &&
     (
-      (assertion.ref == "refs/heads/main" && assertion.ref_type == "branch") 
+      (assertion.ref == "refs/heads/${local.repository_default_branch_name}" && assertion.ref_type == "branch") 
       ${local.allow_pull_request == true ? "|| (attribute.environment != \"${local.github_prod_env_name}\" && assertion.ref_type == \"pull_request\")" : ""}
     )
 EOT
