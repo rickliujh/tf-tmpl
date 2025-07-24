@@ -20,8 +20,8 @@ env:
   REGION: ${gcp_region}
   SERVICE_NAME: ${service_name} 
 
-  GAR_REPO_NAME: ${{ vars.GAR_REPO_NAME }}
-  WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+  GAR_REPO_NAME: $${{ vars.GAR_REPO_NAME }}
+  WORKLOAD_IDENTITY_PROVIDER: $${{ secrets.GCP_WIF_PROVIDER }}
 
 jobs:
   lint:
@@ -91,7 +91,7 @@ jobs:
       - name: Test Report
         continue-on-error: true
         uses: dorny/test-reporter@v2
-        if: ${{ !cancelled() }}
+        if: $${{ !cancelled() }}
         with:
           name: Unit Tests Report
           path: /tmp/gotest.log
@@ -107,20 +107,20 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: peter-evans/create-or-update-comment@v4
         with:
-          issue-number: ${{env.PR_NUMBER}}
+          issue-number: $${{env.PR_NUMBER}}
           body: |
             go-test-coverage report:
             ```
-            ${{ fromJSON(steps.coverage.outputs.report) }}```
+            $${{ fromJSON(steps.coverage.outputs.report) }}```
 
       - name: Comment test report to PR
         if: github.event_name == 'pull_request'
         uses: peter-evans/create-or-update-comment@v4
         with:
-          issue-number: ${{env.PR_NUMBER}}
+          issue-number: $${{env.PR_NUMBER}}
           body: |
-            Test outcome: ${{steps.ut.outcome}}, report:
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Test outcome: $${{steps.ut.outcome}}, report:
+            $${{ github.server_url }}/$${{ github.repository }}/actions/runs/$${{ github.run_id }}
 
       - name: Coverage guard
         if: steps.coverage.outcome == 'failure' || steps.ut.outcome == 'failure'
@@ -160,7 +160,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: peter-evans/create-or-update-comment@v4
         with:
-          issue-number: ${{env.PR_NUMBER}}
+          issue-number: $${{env.PR_NUMBER}}
           body-path: /tmp/govulncheck.log
 
   image:
@@ -179,18 +179,18 @@ jobs:
         name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          workload_identity_provider: $${{ env.WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: Docker Auth
         uses: docker/login-action@v3
         with:
           username: oauth2accesstoken
-          password: ${{ steps.gcp_auth.outputs.auth_token }}
-          registry: ${{ env.REGION }}-docker.pkg.dev
+          password: $${{ steps.gcp_auth.outputs.auth_token }}
+          registry: $${{ env.REGION }}-docker.pkg.dev
 
       - name: Build and Push Container
         run: |-
-          DOCKER_TAG="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO_NAME }}/${{env.SERVICE_NAME}}:${{ github.sha }}"
+          DOCKER_TAG="$${{ env.REGION }}-docker.pkg.dev/$${{ env.PROJECT_ID }}/$${{ env.GAR_REPO_NAME }}/$${{env.SERVICE_NAME}}:$${{ github.sha }}"
           docker build --tag "${DOCKER_TAG}" .
           docker push "${DOCKER_TAG}"
 
@@ -207,16 +207,16 @@ jobs:
         name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          workload_identity_provider: $${{ env.WORKLOAD_IDENTITY_PROVIDER }}
 
       - id: run
         uses: google-github-actions/deploy-cloudrun@v2
         with:
-          project_id: ${{env.PROJECT_ID}}
-          service: ${{ env.SERVICE_NAME }}
-          region: ${{ env.REGION }}
-          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO_NAME }}/${{env.SERVICE_NAME}}:${{ github.sha }}
+          project_id: $${{env.PROJECT_ID}}
+          service: $${{ env.SERVICE_NAME }}
+          region: $${{ env.REGION }}
+          image: $${{ env.REGION }}-docker.pkg.dev/$${{ env.PROJECT_ID }}/$${{ env.GAR_REPO_NAME }}/$${{env.SERVICE_NAME}}:$${{ github.sha }}
 
       - name: 'Show output'
         run: |2-
-          echo ${{ steps.deploy.outputs.url }}
+          echo $${{ steps.deploy.outputs.url }}
