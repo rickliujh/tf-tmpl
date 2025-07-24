@@ -47,8 +47,8 @@ resource "google_cloud_run_v2_service_iam_policy" "policy" {
   policy_data = data.google_iam_policy.ci_run_deploy.policy_data
 }
 
-data "google_compute_default_service_account" "default" {
-  project = var.project_id
+data "google_service_account" "compute_default" {
+  account_id = "${data.google_project.proj.number}-compute@developer.gserviceaccount.com"
 }
 
 data "google_iam_policy" "ci_sa_user" {
@@ -63,6 +63,6 @@ data "google_iam_policy" "ci_sa_user" {
 
 # grant access to default service account
 resource "google_service_account_iam_policy" "wif_sa_user" {
-  service_account_id = "${data.google_project.proj.number}-compute@developer.gserviceaccount.com"
+  service_account_id = data.google_service_account.compute_default.name
   policy_data        = data.google_iam_policy.ci_sa_user.policy_data
 }
