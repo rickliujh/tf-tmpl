@@ -1,0 +1,222 @@
+name: 'CI: Build, test, and push'
+run-name: $${{ github.actor }} running on a PR or merge 🚀
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '${tf_source_path}/**'
+      - 'docs/**'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - '${tf_source_path}/**'
+      - 'docs/**'
+
+env:
+  PROJECT_ID: ${project_id}
+  REGION: ${gcp_region}
+  SERVICE_NAME: ${service_name} 
+
+  GAR_REPO_NAME: ${{ vars.GAR_REPO_NAME }}
+  WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+
+jobs:
+  lint:
+    runs-on: 'ubuntu-latest'
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Run yaml lint
+        id: yamllint
+        continue-on-error: true
+        run: |-
+          pip install --user yamllint
+          make lint-yaml
+
+      - name: Run Go lint
+        id: golint
+        continue-on-error: true
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.2.2
+
+      - name: Linter guard
+        if: steps.yamllint.outcome == 'failure' || steps.golint.outcome == 'failure'
+        shell: bash
+        run: echo "Linter check failed" && exit 1
+
+  test:
+    runs-on: 'ubuntu-latest'
+
+    permissions:
+      contents: read
+      actions: read
+      checks: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Get PR ID
+        id: pr_num
+        if: github.event_name == 'pull_request'
+        run: |-
+          PR_NUMBER=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')
+          echo "PR number is ${PR_NUMBER}"
+          echo "PR_NUMBER=${PR_NUMBER}" >> "${GITHUB_ENV}"
+
+      - name: Run unit test
+        id: ut
+        continue-on-error: true
+        run: GO_TEST_ARGS=-json make test | tail -n +3 | tee /tmp/gotest.log
+
+      - name: Test Report
+        continue-on-error: true
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: Unit Tests Report
+          path: /tmp/gotest.log
+          reporter: golang-json
+
+      - name: check test coverage
+        id: coverage
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          config: ./.github/.testcoverage.yaml
+
+      - name: Comment coverage report to PR
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{env.PR_NUMBER}}
+          body: |
+            go-test-coverage report:
+            ```
+            ${{ fromJSON(steps.coverage.outputs.report) }}```
+
+      - name: Comment test report to PR
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{env.PR_NUMBER}}
+          body: |
+            Test outcome: ${{steps.ut.outcome}}, report:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Coverage guard
+        if: steps.coverage.outcome == 'failure' || steps.ut.outcome == 'failure'
+        shell: bash
+        run: echo "Unit test or coverage check failed" && exit 1
+
+  govulncheck:
+    runs-on: 'ubuntu-latest'
+
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Install vulncheck and run
+        continue-on-error: true
+        run: |-
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          make vulncheck | tee /tmp/govulncheck.log
+
+      - name: Get PR ID
+        id: pr_num
+        if: github.event_name == 'pull_request'
+        run: |-
+          PR_NUMBER=$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')
+          echo "PR number is ${PR_NUMBER}"
+          echo "PR_NUMBER=${PR_NUMBER}" >> "${GITHUB_ENV}"
+
+      - name: Comment to PR
+        if: github.event_name == 'pull_request'
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{env.PR_NUMBER}}
+          body-path: /tmp/govulncheck.log
+
+  image:
+    runs-on: 'ubuntu-latest'
+    needs: [lint, test, govulncheck]
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - id: gcp_auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+
+      - name: Docker Auth
+        uses: docker/login-action@v3
+        with:
+          username: oauth2accesstoken
+          password: ${{ steps.gcp_auth.outputs.auth_token }}
+          registry: ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and Push Container
+        run: |-
+          DOCKER_TAG="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO_NAME }}/${{env.SERVICE_NAME}}:${{ github.sha }}"
+          docker build --tag "${DOCKER_TAG}" .
+          docker push "${DOCKER_TAG}"
+
+  deploy:
+    runs-on: 'ubuntu-latest'
+    needs: [image]
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - id: gcp_auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+
+      - id: run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          project_id: ${{env.PROJECT_ID}}
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.GAR_REPO_NAME }}/${{env.SERVICE_NAME}}:${{ github.sha }}
+
+      - name: 'Show output'
+        run: |2-
+          echo ${{ steps.deploy.outputs.url }}
