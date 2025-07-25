@@ -5,7 +5,7 @@ provider "github" {
 
 data "google_secret_manager_secret_version" "github_token" {
   project = var.project_id
-  secret  = "kickstart-gogrpc-ci-github-token"
+  secret  = var.github_token_secret_manager_key
 }
 
 resource "github_actions_variable" "gar_name" {

@@ -28,6 +28,11 @@ variable "cloud_run_service_name" {
   type        = string
 }
 
+variable "github_token_secret_manager_key" {
+  description = "(Required) The github token key for GCP secret manager"
+  type        = string
+}
+
 variable "override_terraform_source_dir" {
   description = "Override the directory in the repo where the terraform code is, defaults to terraform/ - please include trailing slash in override"
   type        = string
