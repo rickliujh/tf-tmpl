@@ -26,7 +26,7 @@ data "google_cloud_run_v2_service" "cloud_run" {
 }
 
 resource "local_file" "github_actions_cicd_workflow" {
-  filename = "${path.root}/../.github/workflows/${local.github_workflow_file}"
+  filename = "${local.project_root_dir}/.github/workflows/${local.github_workflow_file}"
   content = templatefile("${path.module}/templates/ci.yaml.tmpl", {
     tf_source_dir = local.terraform_source_dir
     project_id    = var.project_id
